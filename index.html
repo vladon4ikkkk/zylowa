@@ -54,6 +54,7 @@
 --premium-start: #fbbf24;
 --premium-end: #f59e0b;
 --premium-glow: 0 0 20px rgba(251, 191, 36, 0.5);
+--verified-color: #1da1f2;
 --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
 --gradient-premium: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%);
 --gradient-story: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
@@ -453,6 +454,11 @@ font-weight: 700;
 color: #000;
 animation: premiumGlow 2s ease-in-out infinite;
 }
+.verified-badge {
+color: var(--verified-color);
+font-size: clamp(1rem, 3vw, 1.2rem);
+margin-left: 2px;
+}
 .banned-badge {
 background: linear-gradient(135deg, #ef4444, #dc2626);
 padding: clamp(3px, 1vw, 4px) clamp(6px, 2vw, 8px);
@@ -532,6 +538,9 @@ opacity: 0.8;
 cursor: pointer;
 margin-bottom: clamp(4px, 1vw, 6px);
 font-weight: 600;
+display: flex;
+align-items: center;
+gap: 4px;
 }
 .message-author.premium {
 background: var(--gradient-premium);
@@ -763,6 +772,10 @@ font-size: clamp(1.0625rem, 4vw, 1.25rem);
 text-align: center;
 margin-bottom: clamp(6px, 1vw, 8px);
 word-break: break-word;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 4px;
 }
 .drawer-bio {
 font-size: clamp(0.8125rem, 3vw, 0.875rem);
@@ -1288,6 +1301,16 @@ border-radius: var(--radius-md);
 margin-bottom: clamp(8px, 2vw, 12px);
 border: 1px solid rgba(251, 191, 36, 0.3);
 }
+.verified-user-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: clamp(8px, 2vw, 12px);
+background: rgba(29, 161, 242, 0.1);
+border-radius: var(--radius-md);
+margin-bottom: clamp(8px, 2vw, 12px);
+border: 1px solid rgba(29, 161, 242, 0.3);
+}
 .banned-user-item {
 display: flex;
 justify-content: space-between;
@@ -1590,6 +1613,10 @@ object-fit: cover;
 font-size: clamp(1.5rem, 5vw, 2rem);
 font-weight: 900;
 margin-bottom: clamp(8px, 2vw, 12px);
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 4px;
 }
 .profile-nick.premium {
 background: var(--gradient-premium);
@@ -2130,7 +2157,6 @@ flex-shrink: 0;
 </div>
 </div>
 </div>
-<!-- 💼 VACANCIES SCREEN -->
 <div id="vacancies-screen" class="screen">
 <div class="settings-header">
 <div class="back-btn" onclick="closeVacancies()">←</div>
@@ -2305,7 +2331,6 @@ pixfakeltd@gmail.com
 <div class="drawer-bio" id="display-bio"></div>
 </div>
 <div style="padding: 12px 0; overflow-y: auto;">
-<div class="menu-item admin" id="admin-panel-btn" onclick="showAdminPanel()" style="display: none;">👑 Админ Панель</div>
 <div class="menu-item premium" id="premium-status" style="display: none;" onclick="showPremiumInfo()">⭐ Zylowa Premium</div>
 <div class="menu-item" onclick="openMyProfile()">👤 Мой профиль</div>
 <div class="menu-item" onclick="openSettings()">⚙️ Настройки</div>
@@ -2350,6 +2375,14 @@ pixfakeltd@gmail.com
 <div class="form-group" style="margin-top: 12px; display: flex; gap: 8px;">
 <input type="text" id="premium-user-input" class="form-input" placeholder="@username" style="flex: 1;">
 <button class="btn btn-small btn-admin" onclick="givePremium()">Выдать</button>
+</div>
+</div>
+<div class="admin-section">
+<div class="admin-section-title">✓ Верифицированные</div>
+<div class="admin-list" id="verified-list"></div>
+<div class="form-group" style="margin-top: 12px; display: flex; gap: 8px;">
+<input type="text" id="verified-user-input" class="form-input" placeholder="@username" style="flex: 1;">
+<button class="btn btn-small btn-admin" onclick="giveVerified()">Верифицировать</button>
 </div>
 </div>
 <div class="admin-section">
@@ -2544,6 +2577,7 @@ let subscribedChannels = JSON.parse(localStorage.getItem('zylowa_channels') || "
 let subscribedGroups = JSON.parse(localStorage.getItem('zylowa_groups') || "[]");
 let admins = [];
 let premiumUsers = [];
+let verifiedUsers = []; // ✅ Список верифицированных
 let bannedUsers = [];
 let discoveredUsers = JSON.parse(localStorage.getItem('zylowa_discovered') || "{}");
 let mqttClient;
@@ -2597,6 +2631,8 @@ const { data: adminsData } = await supabaseClient.from('settings').select('value
 if (adminsData) admins = adminsData.value || [];
 const { data: premiumData } = await supabaseClient.from('settings').select('value').eq('key', 'premium').single();
 if (premiumData) premiumUsers = premiumData.value || [];
+const { data: verifiedData } = await supabaseClient.from('settings').select('value').eq('key', 'verified').single(); // ✅ Загрузка верифицированных
+if (verifiedData) verifiedUsers = verifiedData.value || [];
 const { data: bannedData } = await supabaseClient.from('settings').select('value').eq('key', 'banned').single();
 if (bannedData) bannedUsers = bannedData.value || [];
 const { data: errorData } = await supabaseClient.from('settings').select('value').eq('key', 'error').single();
@@ -2607,6 +2643,7 @@ if (isErrorMode && currentUser) { document.getElementById('maintenance-modal').c
 supabaseClient.channel('settings').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, payload => {
 if (payload.new.key === 'admins') { admins = payload.new.value || []; updateAdminUI(); }
 if (payload.new.key === 'premium') { premiumUsers = payload.new.value || []; updatePremiumUI(); }
+if (payload.new.key === 'verified') { verifiedUsers = payload.new.value || []; } // ✅ Обновление верифицированных
 if (payload.new.key === 'banned') { bannedUsers = payload.new.value || []; checkIfBanned(); }
 if (payload.new.key === 'error') {
 isErrorMode = payload.new.value === 1;
@@ -2636,22 +2673,16 @@ document.getElementById('admin-panel-btn').style.display = 'flex';
 document.getElementById('admin-settings-link').style.display = 'flex';
 renderAdminList();
 renderBannedList();
+renderVerifiedList(); // ✅ Рендер верифицированных
 }
 }
 function updatePremiumUI() {
-if (isPremium()) { 
-document.getElementById('premium-status').style.display = 'flex';
+if (isPremium()) { document.getElementById('premium-status').style.display = 'flex'; }
 }
-}
-function isAdmin() { 
-return admins.includes(currentUser.toLowerCase()); 
-}
-function isPremium() { 
-return premiumUsers.includes(currentUser.toLowerCase()); 
-}
-function isBanned(username) { 
-return bannedUsers.includes(username.toLowerCase()); 
-}
+function isAdmin() { return admins.includes(currentUser.toLowerCase()); }
+function isPremium() { return premiumUsers.includes(currentUser.toLowerCase()); }
+function isVerified(username) { return verifiedUsers.includes(username.toLowerCase()); } // ✅ Проверка верификации
+function isBanned(username) { return bannedUsers.includes(username.toLowerCase()); }
 async function toggleErrorMode(enabled) {
 const value = enabled ? 1 : 0;
 await supabaseClient.from('settings').upsert({ key: 'error', value }, { onConflict: 'key' });
@@ -2791,12 +2822,14 @@ html = `<div class="search-no-results"><span class="icon">🔍</span><div class=
 data.forEach(userData => {
 if (userData.username !== currentUser) {
 const isUserPremium = premiumUsers.includes(userData.username);
+const isUserVerified = isVerified(userData.username); // ✅ Проверка
 const isUserBanned = isBanned(userData.username);
 html += `<div class="search-result-item ${isUserBanned ? 'banned' : ''}" onclick="handleSearchResult('user', '${userData.username}')">
 <div class="avatar user ${isUserBanned ? 'banned' : ''}"><img src="${userData.avatar}"></div>
 <div class="info">
 <div class="name ${isUserPremium && !isUserBanned ? 'premium' : ''}">@${userData.username}
 ${isUserPremium && !isUserBanned ? '<span class="premium-badge">⭐</span>' : ''}
+${isUserVerified && !isUserBanned ? '<span class="verified-badge">✓</span>' : ''}
 ${isUserBanned ? '<span class="banned-badge">🚫</span>' : ''}
 </div>
 <div class="subtitle">${isUserBanned ? '🚫 Заблокирован' : userData.bio}</div>
@@ -2824,7 +2857,8 @@ closeSearchPanel();
 async function openFullProfile(username, bio, avatar, isPremium) {
 currentProfileUser = username;
 document.getElementById('profile-view-avatar').src = avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
-document.getElementById('profile-view-nick').innerText = '@' + username;
+const isUserVerified = isVerified(username); // ✅ Проверка
+document.getElementById('profile-view-nick').innerHTML = '@' + username + (isUserVerified ? '<span class="verified-badge">✓</span>' : '');
 document.getElementById('profile-view-nick').classList.toggle('premium', isPremium);
 document.getElementById('profile-view-bio').innerText = bio || 'Нет биографии';
 const chatBtn = document.getElementById('profile-chat-btn');
@@ -3123,14 +3157,14 @@ err.innerText = error.message.replace('Firebase: ', '').replace('User already re
 async function setupUIAfterLogin() {
 console.log('Setting up UI for user:', currentUser);
 try {
-document.getElementById('display-nick').innerText = '@' + currentUser;
+document.getElementById('display-nick').innerHTML = '@' + currentUser + (isVerified(currentUser) ? '<span class="verified-badge">✓</span>' : '');
 document.getElementById('display-bio').innerText = currentBio;
 document.getElementById('user-av').src = currentAvatar;
 document.getElementById('profile-edit-av').src = currentAvatar;
 document.getElementById('edit-name').value = currentUser;
 document.getElementById('edit-bio').value = currentBio;
-// ✅ Обновляем отображение премиум и админки
-updatePremiumUI();
+if (isPremium()) { document.getElementById('premium-status').style.display = 'flex'; }
+else { document.getElementById('premium-status').style.display = 'none'; }
 updateAdminUI();
 renderAllLists();
 updateUnreadUI();
@@ -3156,7 +3190,7 @@ if (existingUser) { err.innerText = "Юзернейм занят!"; return; }
 }
 try {
 await saveProfileToSupabase(newNick, newBio, currentAvatar);
-document.getElementById('display-nick').innerText = '@' + currentUser;
+document.getElementById('display-nick').innerHTML = '@' + currentUser + (isVerified(currentUser) ? '<span class="verified-badge">✓</span>' : '');
 document.getElementById('display-bio').innerText = currentBio;
 document.getElementById('user-av').src = currentAvatar;
 document.getElementById('profile-edit-av').src = currentAvatar;
@@ -3174,6 +3208,7 @@ function showAdminPanel() {
 if (!isAdmin()) { showToast('Доступ запрещён', 'error'); return; }
 renderAdminList();
 renderPremiumList();
+renderVerifiedList(); // ✅
 renderBannedList();
 document.getElementById('error-mode-toggle').checked = isErrorMode;
 showModal('modal-admin');
@@ -3195,6 +3230,16 @@ premiumUsers.forEach(user => {
 const div = document.createElement('div');
 div.className = 'premium-user-item';
 div.innerHTML = `<span class="name" style="background: var(--gradient-premium); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 600;">@${user} ⭐</span><button class="btn btn-small btn-danger" onclick="removePremium('${user}')">Забрать</button>`;
+list.appendChild(div);
+});
+}
+function renderVerifiedList() { // ✅
+const list = document.getElementById('verified-list');
+list.innerHTML = '';
+verifiedUsers.forEach(user => {
+const div = document.createElement('div');
+div.className = 'verified-user-item';
+div.innerHTML = `<span class="name" style="color: var(--verified-color); font-weight: 600;">@${user} ✓</span><button class="btn btn-small btn-danger" onclick="removeVerified('${user}')">Снять</button>`;
 list.appendChild(div);
 });
 }
@@ -3243,6 +3288,23 @@ premiumUsers = premiumUsers.filter(p => p !== username);
 supabaseClient.from('settings').upsert({ key: 'premium', value: premiumUsers }, { onConflict: 'key' });
 renderPremiumList();
 showToast('Premium забран', 'success');
+}
+async function giveVerified() { // ✅
+const input = document.getElementById('verified-user-input');
+const username = input.value.trim().replace('@', '').toLowerCase();
+if (!username) { showToast('Введите имя', 'error'); return; }
+if (verifiedUsers.includes(username)) { showToast('Уже верифицирован', 'error'); return; }
+verifiedUsers.push(username);
+await supabaseClient.from('settings').upsert({ key: 'verified', value: verifiedUsers }, { onConflict: 'key' });
+renderVerifiedList();
+input.value = '';
+showToast('Пользователь верифицирован! ✓', 'success');
+}
+function removeVerified(username) { // ✅
+verifiedUsers = verifiedUsers.filter(v => v !== username);
+supabaseClient.from('settings').upsert({ key: 'verified', value: verifiedUsers }, { onConflict: 'key' });
+renderVerifiedList();
+showToast('Верификация снята', 'success');
 }
 async function banUser() {
 const input = document.getElementById('ban-user-input');
@@ -3370,11 +3432,12 @@ activePMChats.forEach(pmUser => {
 let uData = allUsers[pmUser] || { av: `https://api.dicebear.com/7.x/bottts/svg?seed=${pmUser}&backgroundColor=9d50bb` };
 let count = unreadCounts[pmUser] || 0;
 let isUserPremium = premiumUsers.includes(pmUser);
+let isUserVerified = isVerified(pmUser); // ✅
 let isUserBanned = isBanned(pmUser);
 let div = document.createElement('div');
 div.className = `chat-item ${isUserBanned ? 'banned' : ''}`;
 div.onclick = () => { if (isUserBanned) { showToast('❌ Этот пользователь заблокирован', 'error'); return; } openChat(pmUser); };
-div.innerHTML = `<div style="position:relative;"><div class="chat-avatar user ${isUserBanned ? 'banned' : ''}"><img src="${uData.av}"></div>${count > 0 ? `<div class="unread-badge">${count}</div>` : ''}</div><div class="chat-info"><div class="chat-name ${isUserPremium && !isUserBanned ? 'premium' : ''} ${isUserBanned ? 'banned' : ''}">@${pmUser} ${isUserPremium && !isUserBanned ? '<span class="premium-badge">⭐</span>' : ''} ${isUserBanned ? '<span class="banned-badge">🚫</span>' : ''}</div><div class="chat-preview">${isUserBanned ? 'Профиль заблокирован' : '💬 ЛС'}</div></div>`;
+div.innerHTML = `<div style="position:relative;"><div class="chat-avatar user ${isUserBanned ? 'banned' : ''}"><img src="${uData.av}"></div>${count > 0 ? `<div class="unread-badge">${count}</div>` : ''}</div><div class="chat-info"><div class="chat-name ${isUserPremium && !isUserBanned ? 'premium' : ''} ${isUserBanned ? 'banned' : ''}">@${pmUser} ${isUserPremium && !isUserBanned ? '<span class="premium-badge">⭐</span>' : ''} ${isUserVerified && !isUserBanned ? '<span class="verified-badge">✓</span>' : ''} ${isUserBanned ? '<span class="banned-badge">🚫</span>' : ''}</div><div class="chat-preview">${isUserBanned ? 'Профиль заблокирован' : '💬 ЛС'}</div></div>`;
 container.appendChild(div);
 });
 }
@@ -3571,6 +3634,7 @@ const id = msgId || ('m-' + Date.now());
 div.className = `message ${mine ? 'mine' : 'other'}`;
 div.id = id;
 const avUrl = av || `https://api.dicebear.com/7.x/bottts/svg?seed=${user}&backgroundColor=9d50bb`;
+const isUserVerified = isVerified(user); // ✅
 const clickAction = `onclick="viewUserProfile('${user}', '${bio || "..."}', '${avUrl}')"`;
 const isAuthorPremium = isUserPremium || premiumUsers.includes(user);
 let contentHtml = text;
@@ -3581,7 +3645,7 @@ contentHtml = `<img src="${text}" class="message-image" onclick="event.stopPropa
 }
 div.innerHTML = `<img src="${avUrl}" class="message-avatar" ${clickAction}>
 <div class="message-content" oncontextmenu="openReactionMenu(event, '${id}')" ontouchstart="handleTouch(event, '${id}')">
-<span class="message-author ${isAuthorPremium ? 'premium' : ''}" ${clickAction}>@${user} ${isAuthorPremium ? '<span class="premium-badge">⭐</span>' : ''}</span>
+<span class="message-author ${isAuthorPremium ? 'premium' : ''}" ${clickAction}>@${user} ${isAuthorPremium ? '<span class="premium-badge">⭐</span>' : ''} ${isUserVerified ? '<span class="verified-badge">✓</span>' : ''}</span>
 <div class="message-text">${contentHtml}</div>
 </div>
 <div class="reactions-container" id="react-badge-${id}"></div>`;
@@ -3971,7 +4035,6 @@ viewer.style.opacity = '1';
 showCurrentStory();
 const story = activeStories[currentStoryIndex];
 const deleteBtn = document.getElementById('story-delete-btn');
-// ✅ ИСПРАВЛЕНИЕ: Кнопка удаления показывается только для своих историй
 deleteBtn.style.display = (story.username === currentUser) ? 'flex' : 'none';
 }
 function closeStoriesViewer() {
@@ -4072,6 +4135,8 @@ window.addAdmin = addAdmin;
 window.removeAdmin = removeAdmin;
 window.givePremium = givePremium;
 window.removePremium = removePremium;
+window.giveVerified = giveVerified; // ✅
+window.removeVerified = removeVerified; // ✅
 window.banUser = banUser;
 window.unbanUser = unbanUser;
 window.clearGlobalChat = clearGlobalChat;
@@ -4108,6 +4173,7 @@ window.setupUIAfterLogin = setupUIAfterLogin;
 window.publishUserProfile = publishUserProfile;
 window.renderAdminList = renderAdminList;
 window.renderPremiumList = renderPremiumList;
+window.renderVerifiedList = renderVerifiedList; // ✅
 window.renderBannedList = renderBannedList;
 window.renderChannelsAndGroupsList = renderChannelsAndGroupsList;
 window.renderPrivateChatsList = renderPrivateChatsList;
@@ -4126,6 +4192,7 @@ window.saveToHistory = saveToHistory;
 window.saveReactionToHistory = saveReactionToHistory;
 window.isAdmin = isAdmin;
 window.isPremium = isPremium;
+window.isVerified = isVerified; // ✅
 window.isBanned = isBanned;
 window.checkIfBanned = checkIfBanned;
 window.updateAdminUI = updateAdminUI;
